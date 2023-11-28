@@ -30,13 +30,13 @@ func parseDictionary(input string) map[string]bool {
 	return dict
 }
 
-const boardSize = 4
-
 func main() {
+	const boardSize = 4
+
 	fmt.Println("Input your Boggle board, separating tiles with spaces:")
 	reader := bufio.NewReader(os.Stdin)
-	var board [boardSize][boardSize]string // can't use rune as there's a Qu board character
-	for i := 0; i < 4; i++ {
+	var board [][]string // can't use rune as there's a Qu board character
+	for i := 0; i < boardSize; i++ {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			log.Fatalf("reading input: %s", err)
@@ -45,20 +45,52 @@ func main() {
 		line = strings.ToLower(line)
 
 		tiles := strings.Split(line, " ")
-		if got, want := len(tiles), 4; got != want {
+		if got, want := len(tiles), boardSize; got != want {
 			log.Fatalf("read %d tiles, want %d space-separated tiles", got, want)
 		}
-		for j, tile := range tiles {
-			board[i][j] = tile
+		board = append(board, tiles)
+	}
+
+	solution := solve(board)
+	common := make(map[string]bool)
+	uncommon := make(map[string]bool)
+	for _, match := range solution.Matches {
+		fmt.Printf("Found %q via %v\n", match.Word, match.Path)
+		if match.Common {
+			common[match.Word] = true
+		} else {
+			uncommon[match.Word] = true
 		}
 	}
 
+	fmt.Printf("\n===\n")
+	fmt.Printf("Checked %d different paths and found %d common words:\n", solution.Traversed, len(common))
+	for _, word := range sortedKeys(common) {
+		fmt.Printf("  %v\n", word)
+	}
+	fmt.Printf("and %d uncommon words: %v\n", len(uncommon), sortedKeys(uncommon))
+}
+
+type Point struct {
+	X, Y int
+}
+
+type Match struct {
+	Path   []Point
+	Word   string
+	Common bool
+}
+
+type Solution struct {
+	Matches   []Match
+	Traversed int
+}
+
+func solve(board [][]string) Solution {
+	boardSize := len(board)
 	commonWords := parseDictionary(smallDictionary)
 	dictionary := parseDictionary(largeDictionary)
 
-	type Point struct {
-		X, Y int
-	}
 	var queue [][]Point
 
 	// resolve converts the points in path to letters on the board.
@@ -106,32 +138,20 @@ func main() {
 		}
 	}
 
-	type Match struct {
-		Path []Point
-		Word string
-	}
-	var allMatches []Match
-	commonMatches := make(map[string]bool)
-	uncommonMatches := make(map[string]bool)
-
-	var traversed int // Keep track of total number of options traversed to report back later for fun.
+	var solution Solution
 	for len(queue) > 0 {
-		traversed++
+		solution.Traversed++
 		path := pop()
 		x, y := last(path)
 
 		// Words of at least 3 letters are considered matches.
 		word := resolve(path)
 		if len(word) >= 3 && dictionary[word] {
-			allMatches = append(allMatches, Match{
-				Path: path,
-				Word: word,
+			solution.Matches = append(solution.Matches, Match{
+				Path:   path,
+				Word:   word,
+				Common: commonWords[word],
 			})
-			if commonWords[word] {
-				commonMatches[word] = true
-			} else {
-				uncommonMatches[word] = true
-			}
 		}
 
 		// Traverse touching tiles.
@@ -151,16 +171,7 @@ func main() {
 		}
 	}
 
-	for _, match := range allMatches {
-		fmt.Printf("Found %q via %v\n", match.Word, match.Path)
-	}
-
-	fmt.Printf("\n===\n")
-	fmt.Printf("Checked %d different paths and found %d common words:\n", traversed, len(commonMatches))
-	for _, word := range sortedKeys(commonMatches) {
-		fmt.Printf("  %v\n", word)
-	}
-	fmt.Printf("and %d uncommon words: %v\n", len(uncommonMatches), sortedKeys(uncommonMatches))
+	return solution
 }
 
 func sortedKeys(in map[string]bool) (out []string) {
