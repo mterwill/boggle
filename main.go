@@ -74,7 +74,7 @@ func main() {
 		last := path[len(path)-1]
 		return last.X, last.Y
 	}
-	// pop removes and returns the first Point from the queue.
+	// pop removes and returns the first path from the queue.
 	pop := func() []Point {
 		defer func() {
 			queue = queue[1:]
